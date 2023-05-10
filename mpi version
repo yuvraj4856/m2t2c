@@ -1,0 +1,49 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <mpi.h>
+
+#define ARRAY_SIZE 1000000
+
+int main(int argc, char **argv) {
+    int rank, size;
+    int *array;
+    double start_time, end_time;
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    if (rank == 0) {
+        array = (int*) malloc(sizeof(int) * ARRAY_SIZE);
+        // Initialize array with random values
+        for (int i = 0; i < ARRAY_SIZE; i++) {
+            array[i] = rand() % 100;
+        }
+        start_time = MPI_Wtime();
+    }
+
+    // Scatter the array to all processes
+    int *subarray = (int*) malloc(sizeof(int) * (ARRAY_SIZE / size));
+    MPI_Scatter(array, ARRAY_SIZE / size, MPI_INT, subarray, ARRAY_SIZE / size, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Perform computation on subarray
+    int sum = 0;
+    for (int i = 0; i < ARRAY_SIZE / size; i++) {
+        sum += subarray[i];
+    }
+
+    // Reduce the result to process 0
+    int total_sum;
+    MPI_Reduce(&sum, &total_sum, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        end_time = MPI_Wtime();
+        printf("Total sum: %d\n", total_sum);
+        printf("Execution time: %f seconds\n", end_time - start_time);
+        free(array);
+    }
+    free(subarray);
+
+    MPI_Finalize();
+    return 0;
+}
